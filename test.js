@@ -581,6 +581,43 @@ test('.stopAndPersist() - isSilent:true can be disabled', async () => {
 	assert.match(result, /@ all done\n$/);
 });
 
+test('.stopAndPersist() stops a spinner after it becomes silent', async () => {
+	const stream = getPassThroughStream();
+	const output = getStream(stream);
+	const spinner = ora({
+		stream,
+		text: 'foo',
+		color: false,
+		isEnabled: true,
+	}).start();
+
+	spinner.isSilent = true;
+	spinner.succeed();
+
+	assert.strictEqual(spinner.isSpinning, false);
+	stream.end();
+	await output;
+});
+
+test('.stop() restores the cursor after output is disabled', async () => {
+	const stream = getPassThroughStream();
+	stream.isTTY = true;
+	const output = getStream(stream);
+	const spinner = ora({
+		stream,
+		text: 'foo',
+		color: false,
+		isEnabled: true,
+	}).start();
+
+	spinner.isEnabled = false;
+	spinner.stop();
+	stream.end();
+
+	const result = await output;
+	assert.ok(result.includes(`${ansiEscape}[?25h`));
+});
+
 test('discardStdin toggles raw mode and data listeners on TTY stdin', () => {
 	if (process.platform === 'win32') {
 		return;

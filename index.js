@@ -32,6 +32,7 @@ class Ora {
 	#drainHandler;
 	#deferRenderTimer;
 	#isDiscardingStdin = false;
+	#cursorHidden = false;
 	#color;
 
 	// Helper to execute writes while preventing hook recursion
@@ -351,7 +352,8 @@ class Ora {
 	}
 
 	clear() {
-		if (!this.isEnabled || !this.#stream.isTTY) {
+		// Allow clearing leftover frames after isEnabled/isSilent flips mid-spin.
+		if (!this.#stream.isTTY || (!this.isEnabled && this.#linesToClear === 0)) {
 			return this;
 		}
 
@@ -533,6 +535,7 @@ class Ora {
 
 		if (this.#options.hideCursor) {
 			cliCursor.hide(this.#stream);
+			this.#cursorHidden = true;
 		}
 
 		if (this.#options.discardStdin && process.stdin.isTTY) {
@@ -562,11 +565,13 @@ class Ora {
 			this.#drainHandler = undefined;
 		}
 
-		if (this.isEnabled) {
-			this.clear();
-			if (this.#options.hideCursor) {
-				cliCursor.show(this.#stream);
-			}
+		// Always undo display changes from start(), even if isEnabled/isSilent
+		// were flipped afterwards (otherwise spinner lines can linger).
+		this.clear();
+
+		if (this.#cursorHidden) {
+			cliCursor.show(this.#stream);
+			this.#cursorHidden = false;
 		}
 
 		if (this.#isDiscardingStdin) {
@@ -594,6 +599,8 @@ class Ora {
 	}
 
 	stopAndPersist(options = {}) {
+		this.stop();
+
 		if (this.isSilent) {
 			return this;
 		}
@@ -605,7 +612,6 @@ class Ora {
 
 		const textToWrite = this.#buildOutputLine(symbol, text, prefixText, suffixText) + '\n';
 
-		this.stop();
 		this.#internalWrite(() => this.#stream.write(textToWrite));
 
 		return this;
