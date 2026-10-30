@@ -32,6 +32,7 @@ class Ora {
 	#drainHandler;
 	#deferRenderTimer;
 	#isDiscardingStdin = false;
+	#cursorHidden = false;
 	#color;
 
 	// Helper to execute writes while preventing hook recursion
@@ -533,6 +534,7 @@ class Ora {
 
 		if (this.#options.hideCursor) {
 			cliCursor.hide(this.#stream);
+			this.#cursorHidden = true;
 		}
 
 		if (this.#options.discardStdin && process.stdin.isTTY) {
@@ -564,9 +566,11 @@ class Ora {
 
 		if (this.isEnabled) {
 			this.clear();
-			if (this.#options.hideCursor) {
-				cliCursor.show(this.#stream);
-			}
+		}
+
+		if (this.#cursorHidden) {
+			cliCursor.show(this.#stream);
+			this.#cursorHidden = false;
 		}
 
 		if (this.#isDiscardingStdin) {
@@ -594,6 +598,8 @@ class Ora {
 	}
 
 	stopAndPersist(options = {}) {
+		this.stop();
+
 		if (this.isSilent) {
 			return this;
 		}
@@ -605,7 +611,6 @@ class Ora {
 
 		const textToWrite = this.#buildOutputLine(symbol, text, prefixText, suffixText) + '\n';
 
-		this.stop();
 		this.#internalWrite(() => this.#stream.write(textToWrite));
 
 		return this;
